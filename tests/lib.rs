@@ -1,7 +1,7 @@
 use ash::vk;
 use romu::Rng;
 
-use vk_alloc::{Allocation, AllocationDescriptor, Allocator, AllocatorDescriptor, MemoryLocation};
+use ash_alloc::{Allocation, AllocationDescriptor, Allocator, AllocatorDescriptor, MemoryLocation};
 
 pub mod fixture;
 
@@ -10,7 +10,7 @@ enum TestLifetime {
     Static,
 }
 
-impl vk_alloc::Lifetime for TestLifetime {}
+impl ash_alloc::Lifetime for TestLifetime {}
 
 #[test]
 fn vulkan_context_creation() {
