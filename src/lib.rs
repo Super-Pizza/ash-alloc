@@ -55,6 +55,8 @@ use std::num::NonZeroUsize;
 use std::ptr;
 
 use ash::vk;
+#[cfg(feature = "tracing")]
+use ash::vk::Handle;
 use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "tracing")]
 use tracing1::{debug, info};
@@ -414,7 +416,9 @@ impl<LT: Lifetime> Allocator<LT> {
             #[cfg(feature = "tracing")]
             debug!(
                 "Deallocating chunk on device memory 0x{:02x}, offset {}, size {}",
-                allocation.device_memory.0, allocation.offset, allocation.size
+                allocation.device_memory.as_raw(),
+                allocation.offset,
+                allocation.size
             );
             memory_pool.lock().free_chunk(chunk_key)?;
         } else {
@@ -422,7 +426,8 @@ impl<LT: Lifetime> Allocator<LT> {
             #[cfg(feature = "tracing")]
             debug!(
                 "Deallocating dedicated device memory 0x{:02x} size {}",
-                allocation.device_memory.0, allocation.size
+                allocation.device_memory.as_raw(),
+                allocation.size
             );
             memory_pool
                 .lock()
@@ -1249,7 +1254,7 @@ impl MemoryBlock {
 
             let allocation_flags = vk::MemoryAllocateFlags::DEVICE_ADDRESS;
             let mut flags_info = vk::MemoryAllocateFlagsInfo::default().flags(allocation_flags);
-            let alloc_info = alloc_info.extend_from(&mut flags_info);
+            let alloc_info = alloc_info.push_next(&mut flags_info);
 
             device
                 .allocate_memory(&alloc_info, None)

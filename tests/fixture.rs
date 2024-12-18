@@ -1,6 +1,8 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
+#[cfg(feature = "tracing")]
+use ash::ext;
 use ash::vk;
 #[cfg(feature = "tracing")]
 use tracing1::{debug, info};
@@ -25,6 +27,8 @@ pub struct VulkanContext {
     // The order is important! Or else we will get an exception on drop!
     #[cfg(feature = "tracing")]
     debug_messenger: vk::DebugUtilsMessengerEXT,
+    #[cfg(feature = "tracing")]
+    debug_utils_ext: ext::debug_utils::Instance,
     pub logical_device: ash::Device,
     pub instance: ash::Instance,
     _entry: ash::Entry,
@@ -40,8 +44,8 @@ impl Drop for VulkanContext {
             self.logical_device.destroy_device(None);
 
             #[cfg(feature = "tracing")]
-            self.instance
-                .destroy_debug_utils_messenger_ext(self.debug_messenger, None);
+            self.debug_utils_ext
+                .destroy_debug_utils_messenger(self.debug_messenger, None);
 
             self.instance.destroy_instance(None);
         };
@@ -77,7 +81,8 @@ impl VulkanContext {
 
         #[cfg(feature = "tracing")]
         {
-            let debug_messenger = Self::create_debug_messenger(&instance);
+            let (debug_messenger, debug_utils_ext) =
+                Self::create_debug_messenger(&entry, &instance);
             Self {
                 _entry: entry,
                 instance,
@@ -86,6 +91,7 @@ impl VulkanContext {
                 queue,
                 buffer_image_granularity,
                 debug_messenger,
+                debug_utils_ext,
             }
         }
 
@@ -164,13 +170,29 @@ impl VulkanContext {
     }
 
     #[cfg(feature = "tracing")]
-    fn create_debug_messenger(instance: &ash::Instance) -> vk::DebugUtilsMessengerEXT {
+    fn create_debug_messenger(
+        entry: &ash::Entry,
+        instance: &ash::Instance,
+    ) -> (vk::DebugUtilsMessengerEXT, ext::debug_utils::Instance) {
         let info = vk::DebugUtilsMessengerCreateInfoEXT::default()
-            .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
-            .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
+            .message_severity(
+                vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+                    | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                    | vk::DebugUtilsMessageSeverityFlagsEXT::INFO,
+            )
+            .message_type(
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
+                    | vk::DebugUtilsMessageTypeFlagsEXT::DEVICE_ADDRESS_BINDING,
+            )
             .pfn_user_callback(Some(debug_utils_callback));
 
-        unsafe { instance.create_debug_utils_messenger_ext(&info, None) }.unwrap()
+        let instance = ext::debug_utils::Instance::new(entry, instance);
+
+        let debug_messenger =
+            unsafe { instance.create_debug_utils_messenger(&info, None) }.unwrap();
+        (debug_messenger, instance)
     }
 
     fn request_device(instance: &ash::Instance) -> (vk::PhysicalDevice, ash::Device, vk::Queue) {
@@ -278,7 +300,7 @@ impl VulkanContext {
 
 #[cfg(feature = "tracing")]
 unsafe extern "system" fn debug_utils_callback(
-    message_severity: vk::DebugUtilsMessageSeverityFlagBitsEXT,
+    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
     message_types: vk::DebugUtilsMessageTypeFlagsEXT,
     p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
     _p_user_data: *mut std::ffi::c_void,
@@ -291,16 +313,16 @@ unsafe extern "system" fn debug_utils_callback(
     let ty = format!("{:?}", message_types);
 
     match message_severity {
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::ERROR_EXT => {
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
             panic!("{} - {:?}", ty, message)
         }
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::WARNING_EXT => {
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
             panic!("{} - {:?}", ty, message)
         }
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::INFO_EXT => {
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
             info!("{} - {:?}", ty, message)
         }
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::VERBOSE_EXT => {
+        vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => {
             debug!("{} - {:?}", ty, message)
         }
         _ => {
