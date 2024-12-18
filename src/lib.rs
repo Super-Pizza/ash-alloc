@@ -32,7 +32,7 @@
 //!             &logical_device,
 //!             &AllocationDescriptor {
 //!                 location: MemoryLocation::GpuOnly,
-//!                 requirements: vk::MemoryRequirementsBuilder::new()
+//!                 requirements: vk::MemoryRequirements::default()
 //!                     .alignment(512)
 //!                     .size(1024)
 //!                     .memory_type_bits(u32::MAX)
@@ -54,7 +54,7 @@ use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::ptr;
 
-use erupt::{vk, ExtendableFrom};
+use ash::vk;
 use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "tracing")]
 use tracing1::{debug, info};
@@ -103,7 +103,7 @@ impl<LT: Lifetime> Allocator<LT> {
     /// Caller needs to make sure that the provided instance and device are in a valid state.
     #[cfg_attr(feature = "profiling", profiling::function)]
     pub unsafe fn new(
-        instance: &erupt::InstanceLoader,
+        instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         descriptor: &AllocatorDescriptor,
     ) -> Result<Self> {
@@ -141,18 +141,17 @@ impl<LT: Lifetime> Allocator<LT> {
     #[cfg_attr(feature = "profiling", profiling::function)]
     pub unsafe fn allocate_memory_for_buffer(
         &self,
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         buffer: vk::Buffer,
         location: MemoryLocation,
         lifetime: LT,
     ) -> Result<Allocation<LT>> {
-        let info = vk::BufferMemoryRequirementsInfo2Builder::new().buffer(buffer);
-        let mut dedicated_requirements = vk::MemoryDedicatedRequirementsBuilder::new();
-        let requirements =
-            vk::MemoryRequirements2Builder::new().extend_from(&mut dedicated_requirements);
+        let info = vk::BufferMemoryRequirementsInfo2::default().buffer(buffer);
+        let mut dedicated_requirements = vk::MemoryDedicatedRequirements::default();
+        let mut requirements =
+            vk::MemoryRequirements2::default().push_next(&mut dedicated_requirements);
 
-        let requirements =
-            device.get_buffer_memory_requirements2(&info, Some(requirements.build_dangling()));
+        device.get_buffer_memory_requirements2(&info, &mut requirements);
 
         let memory_requirements = requirements.memory_requirements;
 
@@ -177,19 +176,18 @@ impl<LT: Lifetime> Allocator<LT> {
     #[cfg_attr(feature = "profiling", profiling::function)]
     pub unsafe fn allocate_memory_for_image(
         &self,
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         image: vk::Image,
         location: MemoryLocation,
         lifetime: LT,
         is_optimal: bool,
     ) -> Result<Allocation<LT>> {
-        let info = vk::ImageMemoryRequirementsInfo2Builder::new().image(image);
-        let mut dedicated_requirements = vk::MemoryDedicatedRequirementsBuilder::new();
-        let requirements =
-            vk::MemoryRequirements2Builder::new().extend_from(&mut dedicated_requirements);
+        let info = vk::ImageMemoryRequirementsInfo2::default().image(image);
+        let mut dedicated_requirements = vk::MemoryDedicatedRequirements::default();
+        let mut requirements =
+            vk::MemoryRequirements2::default().push_next(&mut dedicated_requirements);
 
-        let requirements =
-            device.get_image_memory_requirements2(&info, Some(requirements.build_dangling()));
+        device.get_image_memory_requirements2(&info, &mut requirements);
 
         let memory_requirements = requirements.memory_requirements;
 
@@ -214,7 +212,7 @@ impl<LT: Lifetime> Allocator<LT> {
     #[cfg_attr(feature = "profiling", profiling::function)]
     pub unsafe fn allocate(
         &self,
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         descriptor: &AllocationDescriptor<LT>,
     ) -> Result<Allocation<LT>> {
         let size = descriptor.requirements.size;
@@ -391,7 +389,7 @@ impl<LT: Lifetime> Allocator<LT> {
     #[cfg_attr(feature = "profiling", profiling::function)]
     pub unsafe fn deallocate(
         &self,
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         allocation: &Allocation<LT>,
     ) -> Result<()> {
         let memory_type_index: usize = allocation.memory_type_index.try_into()?;
@@ -440,7 +438,7 @@ impl<LT: Lifetime> Allocator<LT> {
     /// Caller needs to make sure that no allocations are used anymore and will not being used
     /// after calling this function.
     #[cfg_attr(feature = "profiling", profiling::function)]
-    pub unsafe fn cleanup(&self, device: &erupt::DeviceLoader) {
+    pub unsafe fn cleanup(&self, device: &ash::Device) {
         for (_, mut lifetime_pools) in self.pools.write().drain() {
             lifetime_pools.drain(..).for_each(|pool| {
                 pool.lock().blocks.iter_mut().for_each(|block| {
@@ -822,7 +820,7 @@ impl MemoryPool {
     #[cfg_attr(feature = "profiling", profiling::function)]
     unsafe fn allocate_dedicated<LT: Lifetime>(
         &mut self,
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         size: vk::DeviceSize,
         lifetime: LT,
     ) -> Result<Allocation<LT>> {
@@ -848,7 +846,7 @@ impl MemoryPool {
     #[cfg_attr(feature = "profiling", profiling::function)]
     unsafe fn allocate<LT: Lifetime>(
         &mut self,
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         buffer_image_granularity: u64,
         size: vk::DeviceSize,
         alignment: vk::DeviceSize,
@@ -1054,7 +1052,7 @@ impl MemoryPool {
     }
 
     #[cfg_attr(feature = "profiling", profiling::function)]
-    unsafe fn allocate_new_block(&mut self, device: &erupt::DeviceLoader) -> Result<()> {
+    unsafe fn allocate_new_block(&mut self, device: &ash::Device) -> Result<()> {
         let block = MemoryBlock::new(
             device,
             self.block_size,
@@ -1183,11 +1181,7 @@ impl MemoryPool {
     }
 
     #[cfg_attr(feature = "profiling", profiling::function)]
-    unsafe fn free_block(
-        &mut self,
-        device: &erupt::DeviceLoader,
-        block_key: NonZeroUsize,
-    ) -> Result<()> {
+    unsafe fn free_block(&mut self, device: &ash::Device, block_key: NonZeroUsize) -> Result<()> {
         let mut block = self.blocks[block_key.get()]
             .take()
             .ok_or(AllocatorError::CantFindBlock)?;
@@ -1249,7 +1243,7 @@ unsafe impl Send for MemoryBlock {}
 impl MemoryBlock {
     #[cfg_attr(feature = "profiling", profiling::function)]
     unsafe fn new(
-        device: &erupt::DeviceLoader,
+        device: &ash::Device,
         size: vk::DeviceSize,
         memory_type_index: u32,
         is_mappable: bool,
@@ -1257,12 +1251,12 @@ impl MemoryBlock {
     ) -> Result<Self> {
         #[cfg(feature = "vk-buffer-device-address")]
         let device_memory = {
-            let alloc_info = vk::MemoryAllocateInfoBuilder::new()
+            let alloc_info = vk::MemoryAllocateInfo::default()
                 .allocation_size(size)
                 .memory_type_index(memory_type_index);
 
             let allocation_flags = vk::MemoryAllocateFlags::DEVICE_ADDRESS;
-            let mut flags_info = vk::MemoryAllocateFlagsInfoBuilder::new().flags(allocation_flags);
+            let mut flags_info = vk::MemoryAllocateFlagsInfo::default().flags(allocation_flags);
             let alloc_info = alloc_info.extend_from(&mut flags_info);
 
             device
@@ -1272,7 +1266,7 @@ impl MemoryBlock {
 
         #[cfg(not(feature = "vk-buffer-device-address"))]
         let device_memory = {
-            let alloc_info = vk::MemoryAllocateInfoBuilder::new()
+            let alloc_info = vk::MemoryAllocateInfo::default()
                 .allocation_size(size)
                 .memory_type_index(memory_type_index);
 
@@ -1309,7 +1303,7 @@ impl MemoryBlock {
     }
 
     #[cfg_attr(feature = "profiling", profiling::function)]
-    unsafe fn destroy(&mut self, device: &erupt::DeviceLoader) {
+    unsafe fn destroy(&mut self, device: &ash::Device) {
         if !self.mapped_ptr.is_null() {
             device.unmap_memory(self.device_memory);
         }
@@ -1339,17 +1333,14 @@ fn is_on_same_page(offset_a: u64, size_a: u64, offset_b: u64, page_size: u64) ->
 
 #[cfg_attr(feature = "profiling", profiling::function)]
 unsafe fn query_driver(
-    instance: &erupt::InstanceLoader,
+    instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
 ) -> (vk::DriverId, bool, u64) {
     let mut vulkan_12_properties = vk::PhysicalDeviceVulkan12Properties::default();
-    let physical_device_properties =
-        vk::PhysicalDeviceProperties2Builder::new().extend_from(&mut vulkan_12_properties);
+    let mut physical_device_properties =
+        vk::PhysicalDeviceProperties2::default().push_next(&mut vulkan_12_properties);
 
-    let physical_device_properties = instance.get_physical_device_properties2(
-        physical_device,
-        Some(physical_device_properties.build_dangling()),
-    );
+    instance.get_physical_device_properties2(physical_device, &mut physical_device_properties);
     let is_integrated =
         physical_device_properties.properties.device_type == vk::PhysicalDeviceType::INTEGRATED_GPU;
 
