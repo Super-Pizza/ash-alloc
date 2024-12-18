@@ -1,4 +1,4 @@
-use erupt::vk;
+use ash::vk;
 use romu::Rng;
 
 use vk_alloc::{Allocation, AllocationDescriptor, Allocator, AllocatorDescriptor, MemoryLocation};
@@ -48,11 +48,10 @@ fn allocator_simple_free() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(512)
                         .size(1024)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -93,11 +92,10 @@ fn allocator_allocation_1024() {
                         &ctx.logical_device,
                         &AllocationDescriptor {
                             location: MemoryLocation::GpuOnly,
-                            requirements: vk::MemoryRequirementsBuilder::new()
+                            requirements: vk::MemoryRequirements::default()
                                 .alignment(512)
                                 .size(1024)
-                                .memory_type_bits(u32::MAX)
-                                .build(),
+                                .memory_type_bits(u32::MAX),
                             lifetime: TestLifetime::Static,
                             is_dedicated: false,
                             is_optimal: false,
@@ -154,11 +152,10 @@ fn allocator_allocation_256() {
                         &ctx.logical_device,
                         &AllocationDescriptor {
                             location: MemoryLocation::GpuOnly,
-                            requirements: vk::MemoryRequirementsBuilder::new()
+                            requirements: vk::MemoryRequirements::default()
                                 .alignment(1024)
                                 .size(256)
-                                .memory_type_bits(u32::MAX)
-                                .build(),
+                                .memory_type_bits(u32::MAX),
                             lifetime: TestLifetime::Static,
                             is_dedicated: false,
                             is_optimal: false,
@@ -218,11 +215,10 @@ fn allocator_reverse_free() {
                         &ctx.logical_device,
                         &AllocationDescriptor {
                             location: MemoryLocation::GpuOnly,
-                            requirements: vk::MemoryRequirementsBuilder::new()
+                            requirements: vk::MemoryRequirements::default()
                                 .alignment(1024)
                                 .size(256)
-                                .memory_type_bits(u32::MAX)
-                                .build(),
+                                .memory_type_bits(u32::MAX),
                             lifetime: TestLifetime::Static,
                             is_dedicated: false,
                             is_optimal: false,
@@ -291,11 +287,10 @@ fn allocator_free_every_second_time() {
                         &ctx.logical_device,
                         &AllocationDescriptor {
                             location: MemoryLocation::GpuOnly,
-                            requirements: vk::MemoryRequirementsBuilder::new()
+                            requirements: vk::MemoryRequirements::default()
                                 .alignment(1024)
                                 .size(1024)
-                                .memory_type_bits(u32::MAX)
-                                .build(),
+                                .memory_type_bits(u32::MAX),
                             lifetime: TestLifetime::Static,
                             is_dedicated: false,
                             is_optimal: false,
@@ -352,11 +347,10 @@ fn allocator_allocation_dedicated() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(512)
                         .size(10 * 1024 * 1024) // 10 MiB
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -398,11 +392,10 @@ fn allocator_properly_merge_free_entries() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(256)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -414,11 +407,10 @@ fn allocator_properly_merge_free_entries() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(256)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -430,11 +422,10 @@ fn allocator_properly_merge_free_entries() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(256)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -446,11 +437,10 @@ fn allocator_properly_merge_free_entries() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(256)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -493,11 +483,10 @@ fn allocator_fuzzy() {
                         &ctx.logical_device,
                         &AllocationDescriptor {
                             location: MemoryLocation::CpuToGpu,
-                            requirements: vk::MemoryRequirementsBuilder::new()
+                            requirements: vk::MemoryRequirements::default()
                                 .alignment(256)
                                 .size(size as u64)
-                                .memory_type_bits(u32::MAX)
-                                .build(),
+                                .memory_type_bits(u32::MAX),
                             lifetime: TestLifetime::Static,
                             is_dedicated: false,
                             is_optimal: false,
@@ -551,11 +540,10 @@ fn allocator_granularity() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(512)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,
@@ -573,11 +561,10 @@ fn allocator_granularity() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(1024)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: true,
@@ -595,11 +582,10 @@ fn allocator_granularity() {
                 &ctx.logical_device,
                 &AllocationDescriptor {
                     location: MemoryLocation::GpuOnly,
-                    requirements: vk::MemoryRequirementsBuilder::new()
+                    requirements: vk::MemoryRequirements::default()
                         .alignment(256)
                         .size(1024)
-                        .memory_type_bits(u32::MAX)
-                        .build(),
+                        .memory_type_bits(u32::MAX),
                     lifetime: TestLifetime::Static,
                     is_dedicated: false,
                     is_optimal: false,

@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/hasenbanck/vk-alloc"
 categories = ["rendering::graphics-api", "rendering"]
 keywords = ["vk", "vulkan", "erupt", "allocator", "memory"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 ash = "0.38"
@@ -27,4 +27,9 @@ vk-buffer-device-address = []
 
 [dev-dependencies]
 romu = { version = "0.6", default-features = false }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["ansi", "env-filter", "fmt", "registry"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "ansi",
+    "env-filter",
+    "fmt",
+    "registry",
+] }

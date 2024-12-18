@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-use erupt::{cstr, vk};
+use ash::vk;
 #[cfg(feature = "tracing")]
 use tracing1::{debug, info};
 
@@ -19,15 +19,15 @@ pub fn initialize_logging() {
     });
 }
 
-const LAYER_KHRONOS_VALIDATION: *const c_char = cstr!("VK_LAYER_KHRONOS_validation");
+const LAYER_KHRONOS_VALIDATION: *const c_char = c"VK_LAYER_KHRONOS_validation".as_ptr();
 
 pub struct VulkanContext {
     // The order is important! Or else we will get an exception on drop!
     #[cfg(feature = "tracing")]
     debug_messenger: vk::DebugUtilsMessengerEXT,
-    pub logical_device: erupt::DeviceLoader,
-    pub instance: erupt::InstanceLoader,
-    _entry: erupt::EntryLoader,
+    pub logical_device: ash::Device,
+    pub instance: ash::Instance,
+    _entry: ash::Entry,
 
     pub physical_device: vk::PhysicalDevice,
     pub queue: vk::Queue,
@@ -53,12 +53,12 @@ impl VulkanContext {
         #[cfg(feature = "tracing")]
         initialize_logging();
 
-        let entry = erupt::EntryLoader::new().unwrap();
+        let entry = unsafe { ash::Entry::load().unwrap() };
 
         let engine_name = std::ffi::CString::new("erupt").unwrap();
         let app_name = std::ffi::CString::new("vk-alloc").unwrap();
 
-        let app_info = vk::ApplicationInfoBuilder::new()
+        let app_info = vk::ApplicationInfo::default()
             .application_name(&app_name)
             .application_version(vk::make_api_version(0, 0, 1, 0))
             .engine_name(&engine_name)
@@ -102,16 +102,13 @@ impl VulkanContext {
         }
     }
 
-    fn create_instance_extensions(entry: &erupt::EntryLoader) -> Vec<*const std::os::raw::c_char> {
-        let instance_extensions = unsafe {
-            entry
-                .enumerate_instance_extension_properties(None, None)
-                .unwrap()
-        };
+    fn create_instance_extensions(entry: &ash::Entry) -> Vec<*const std::os::raw::c_char> {
+        let instance_extensions =
+            unsafe { entry.enumerate_instance_extension_properties(None).unwrap() };
 
         let mut extensions = Vec::new();
 
-        extensions.push(vk::EXT_DEBUG_UTILS_EXTENSION_NAME);
+        extensions.push(ash::ext::debug_utils::NAME.as_ptr());
 
         extensions.retain(|ext| {
             let extension = unsafe { CStr::from_ptr(*ext) };
@@ -130,8 +127,8 @@ impl VulkanContext {
         extensions
     }
 
-    fn create_layers(entry: &erupt::EntryLoader) -> Vec<*const std::os::raw::c_char> {
-        let instance_layers = unsafe { entry.enumerate_instance_layer_properties(None) }.unwrap();
+    fn create_layers(entry: &ash::Entry) -> Vec<*const std::os::raw::c_char> {
+        let instance_layers = unsafe { entry.enumerate_instance_layer_properties() }.unwrap();
 
         let mut layers = Vec::new();
 
@@ -152,23 +149,23 @@ impl VulkanContext {
     }
 
     fn create_instance(
-        entry: &erupt::EntryLoader,
-        app_info: &vk::ApplicationInfoBuilder,
+        entry: &ash::Entry,
+        app_info: &vk::ApplicationInfo,
         extensions: &[*const c_char],
         layers: &[*const c_char],
-    ) -> erupt::InstanceLoader {
-        let create_info = vk::InstanceCreateInfoBuilder::new()
+    ) -> ash::Instance {
+        let create_info = vk::InstanceCreateInfo::default()
             .flags(vk::InstanceCreateFlags::empty())
             .application_info(&app_info)
             .enabled_layer_names(&layers)
             .enabled_extension_names(&extensions);
 
-        unsafe { erupt::InstanceLoader::new(&entry, &create_info) }.unwrap()
+        unsafe { entry.create_instance(&create_info, None) }.unwrap()
     }
 
     #[cfg(feature = "tracing")]
-    fn create_debug_messenger(instance: &erupt::InstanceLoader) -> vk::DebugUtilsMessengerEXT {
-        let info = vk::DebugUtilsMessengerCreateInfoEXTBuilder::new()
+    fn create_debug_messenger(instance: &ash::Instance) -> vk::DebugUtilsMessengerEXT {
+        let info = vk::DebugUtilsMessengerCreateInfoEXT::default()
             .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
             .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
             .pfn_user_callback(Some(debug_utils_callback));
@@ -176,10 +173,8 @@ impl VulkanContext {
         unsafe { instance.create_debug_utils_messenger_ext(&info, None) }.unwrap()
     }
 
-    fn request_device(
-        instance: &erupt::InstanceLoader,
-    ) -> (vk::PhysicalDevice, erupt::DeviceLoader, vk::Queue) {
-        let physical_devices = unsafe { instance.enumerate_physical_devices(None).unwrap() };
+    fn request_device(instance: &ash::Instance) -> (vk::PhysicalDevice, ash::Device, vk::Queue) {
+        let physical_devices = unsafe { instance.enumerate_physical_devices().unwrap() };
 
         let mut chosen = None;
         for device in physical_devices {
@@ -199,16 +194,16 @@ impl VulkanContext {
     }
 
     fn create_logical_device(
-        instance: &erupt::InstanceLoader,
+        instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
-    ) -> (erupt::DeviceLoader, vk::Queue) {
+    ) -> (ash::Device, vk::Queue) {
         let queue_family_properties =
-            unsafe { instance.get_physical_device_queue_family_properties(physical_device, None) };
+            unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
         let transfer_queue_family_id =
             Self::find_queue_family(vk::QueueFlags::TRANSFER, &queue_family_properties);
 
-        let queue_infos = [vk::DeviceQueueCreateInfoBuilder::new()
+        let queue_infos = [vk::DeviceQueueCreateInfo::default()
             .queue_family_index(transfer_queue_family_id)
             .queue_priorities(&[1.0])];
         let logical_device = Self::create_device(instance, physical_device, &queue_infos);
@@ -240,28 +235,27 @@ impl VulkanContext {
     }
 
     fn create_device(
-        instance: &erupt::InstanceLoader,
+        instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
-        queue_infos: &[vk::DeviceQueueCreateInfoBuilder],
-    ) -> erupt::DeviceLoader {
+        queue_infos: &[vk::DeviceQueueCreateInfo],
+    ) -> ash::Device {
         let device_extensions = Self::create_device_extensions(instance, physical_device);
 
-        let device_create_info = vk::DeviceCreateInfoBuilder::new()
+        let device_create_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(queue_infos)
             .enabled_extension_names(&device_extensions);
 
-        unsafe { erupt::DeviceLoader::new(instance, physical_device, &device_create_info) }.unwrap()
+        unsafe { instance.create_device(physical_device, &device_create_info, None) }.unwrap()
     }
 
     fn create_device_extensions(
-        instance: &erupt::InstanceLoader,
+        instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
     ) -> Vec<*const c_char> {
         let mut extensions = Vec::new();
 
         let device_extensions =
-            unsafe { instance.enumerate_device_extension_properties(physical_device, None, None) }
-                .unwrap();
+            unsafe { instance.enumerate_device_extension_properties(physical_device) }.unwrap();
 
         extensions.retain(|ext| {
             let extension = unsafe { CStr::from_ptr(*ext) };
