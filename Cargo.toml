@@ -1,6 +1,6 @@
 [package]
 name = "ash-alloc"
-version = "2.3.0"
+version = "2.3.1"
 authors = ["Nils Hasenbanck <nils@hasenbanck.de>", "Fabien Cournoyer <fabien@cournoyer.club>"]
 description = "A segregated list memory allocator for Vulkan, but for Ash"
 license = "Zlib OR MIT OR Apache-2.0"
