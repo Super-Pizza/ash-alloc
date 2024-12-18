@@ -156,9 +156,9 @@ impl VulkanContext {
     ) -> ash::Instance {
         let create_info = vk::InstanceCreateInfo::default()
             .flags(vk::InstanceCreateFlags::empty())
-            .application_info(&app_info)
-            .enabled_layer_names(&layers)
-            .enabled_extension_names(&extensions);
+            .application_info(app_info)
+            .enabled_layer_names(layers)
+            .enabled_extension_names(extensions);
 
         unsafe { entry.create_instance(&create_info, None) }.unwrap()
     }

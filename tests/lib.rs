@@ -85,7 +85,6 @@ fn allocator_allocation_1024() {
         .unwrap();
 
         let mut allocations: Vec<Allocation<_>> = (0..1024)
-            .into_iter()
             .map(|i| {
                 let allocation = alloc
                     .allocate(
@@ -145,7 +144,6 @@ fn allocator_allocation_256() {
         .unwrap();
 
         let mut allocations: Vec<Allocation<_>> = (0..1024)
-            .into_iter()
             .map(|i| {
                 let allocation = alloc
                     .allocate(
@@ -208,7 +206,6 @@ fn allocator_reverse_free() {
         .unwrap();
 
         let mut allocations: Vec<Allocation<_>> = (0..1024)
-            .into_iter()
             .map(|i| {
                 let allocation = alloc
                     .allocate(
@@ -280,9 +277,8 @@ fn allocator_free_every_second_time() {
         .unwrap();
 
         let allocations: Vec<Allocation<_>> = (0..1024)
-            .into_iter()
             .map(|_| {
-                let allocation = alloc
+                alloc
                     .allocate(
                         &ctx.logical_device,
                         &AllocationDescriptor {
@@ -296,8 +292,7 @@ fn allocator_free_every_second_time() {
                             is_optimal: false,
                         },
                     )
-                    .unwrap();
-                allocation
+                    .unwrap()
             })
             .collect();
 

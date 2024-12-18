@@ -121,7 +121,7 @@ impl<LT: Lifetime> Allocator<LT> {
         #[cfg(feature = "tracing")]
         print_memory_types(memory_properties, &memory_types)?;
 
-        let block_size: vk::DeviceSize = (2u64).pow(descriptor.block_size.into()).into();
+        let block_size: vk::DeviceSize = (2u64).pow(descriptor.block_size.into());
 
         Ok(Self {
             driver_id,
@@ -426,7 +426,7 @@ impl<LT: Lifetime> Allocator<LT> {
             );
             memory_pool
                 .lock()
-                .free_block(&device, allocation.block_key)?;
+                .free_block(device, allocation.block_key)?;
         }
 
         Ok(())
@@ -443,7 +443,7 @@ impl<LT: Lifetime> Allocator<LT> {
             lifetime_pools.drain(..).for_each(|pool| {
                 pool.lock().blocks.iter_mut().for_each(|block| {
                     if let Some(block) = block {
-                        block.destroy(&device)
+                        block.destroy(device)
                     }
                 })
             });
@@ -457,11 +457,9 @@ impl<LT: Lifetime> Allocator<LT> {
         for (_, lifetime_pools) in self.pools.read().iter() {
             lifetime_pools.iter().for_each(|pool| {
                 let pool = pool.lock();
-                for chunk in &pool.chunks {
-                    if let Some(chunk) = chunk {
-                        if chunk.chunk_type != ChunkType::Free {
-                            count += 1;
-                        }
+                for chunk in pool.chunks.iter().flatten() {
+                    if chunk.chunk_type != ChunkType::Free {
+                        count += 1;
                     }
                 }
             });
@@ -470,11 +468,9 @@ impl<LT: Lifetime> Allocator<LT> {
         for (_, lifetime_pools) in self.pools.read().iter() {
             lifetime_pools.iter().for_each(|pool| {
                 let pool = pool.lock();
-                for block in &pool.blocks {
-                    if let Some(block) = block {
-                        if block.is_dedicated {
-                            count += 1;
-                        }
+                for block in pool.blocks.iter().flatten() {
+                    if block.is_dedicated {
+                        count += 1;
                     }
                 }
             });
@@ -490,7 +486,7 @@ impl<LT: Lifetime> Allocator<LT> {
 
         for (_, lifetime_pools) in self.pools.read().iter() {
             lifetime_pools.iter().for_each(|pool| {
-                collect_start_chunks(&pool).iter().for_each(|key| {
+                collect_start_chunks(pool).iter().for_each(|key| {
                     let mut next_key: NonZeroUsize = *key;
                     let mut previous_size: vk::DeviceSize = 0;
                     let mut previous_offset: vk::DeviceSize = 0;
@@ -527,11 +523,9 @@ impl<LT: Lifetime> Allocator<LT> {
         for (_, lifetime_pools) in self.pools.read().iter() {
             lifetime_pools.iter().for_each(|pool| {
                 let pool = pool.lock();
-                for chunk in &pool.chunks {
-                    if let Some(chunk) = chunk {
-                        if chunk.chunk_type != ChunkType::Free {
-                            bytes += chunk.size;
-                        }
+                for chunk in pool.chunks.iter().flatten() {
+                    if chunk.chunk_type != ChunkType::Free {
+                        bytes += chunk.size;
                     }
                 }
             });
@@ -540,11 +534,9 @@ impl<LT: Lifetime> Allocator<LT> {
         for (_, lifetime_pools) in self.pools.read().iter() {
             lifetime_pools.iter().for_each(|pool| {
                 let pool = pool.lock();
-                for block in &pool.blocks {
-                    if let Some(block) = block {
-                        if block.is_dedicated {
-                            bytes += block.size;
-                        }
+                for block in pool.blocks.iter().flatten() {
+                    if block.is_dedicated {
+                        bytes += block.size;
                     }
                 }
             });
@@ -560,7 +552,7 @@ impl<LT: Lifetime> Allocator<LT> {
 
         for (_, lifetime_pools) in self.pools.read().iter() {
             lifetime_pools.iter().for_each(|pool| {
-                collect_start_chunks(&pool).iter().for_each(|key| {
+                collect_start_chunks(pool).iter().for_each(|key| {
                     let mut next_key: NonZeroUsize = *key;
                     let mut previous_size: vk::DeviceSize = 0;
                     let mut previous_offset: vk::DeviceSize = 0;
@@ -774,7 +766,7 @@ impl MemoryPool {
             let min_bucket_element_size = if i == 0 {
                 512
             } else {
-                2u64.pow(MINIMAL_BUCKET_SIZE_LOG2 - 1 + i).into()
+                2u64.pow(MINIMAL_BUCKET_SIZE_LOG2 - 1 + i)
             };
             let max_elements: usize = (block_size / min_bucket_element_size).try_into()?;
             free_chunks.push(Vec::with_capacity(512.min(max_elements)));
